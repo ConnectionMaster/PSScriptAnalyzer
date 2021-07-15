@@ -73,7 +73,7 @@ Configuration MyDscConfiguration {
             $settings = @{
                 'Rules' = @{
                     'PSAvoidUsingCmdletAliases' = @{
-                        'Whitelist' = @('cd')
+                        'allowlist' = @('cd')
                     }
                 }
             }
@@ -83,7 +83,7 @@ Configuration MyDscConfiguration {
             $settings = @{
                 'Rules' = @{
                     'PSAvoidUsingCmdletAliases' = @{
-                        'Whitelist' = @('cd')
+                        'allowlist' = @('cd')
                     }
                 }
             }
@@ -116,6 +116,13 @@ Configuration MyDscConfiguration {
             }
 
             $violations.Count | Should -Be $expectedViolations
+        }
+
+        It 'Warn about incorrect syntax around process block' {
+            $scriptDefinition = { function foo { IShouldNotBeHere; process {} } }
+            $violations = Invoke-ScriptAnalyzer -IncludeRule PSAvoidUsingCmdletAliases -ScriptDefinition "$scriptDefinition"
+            $violations.Count | Should -Be 1
+            $violations.Severity | Should -Be ([Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticSeverity]::ParseError)
         }
     }
 }

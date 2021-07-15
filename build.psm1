@@ -311,14 +311,17 @@ function Start-ScriptAnalyzerBuild
         $settingsFiles = Get-Childitem "$projectRoot\Engine\Settings" | ForEach-Object -MemberName FullName
         Publish-File $settingsFiles (Join-Path -Path $script:destinationDir -ChildPath Settings)
 
+        $rulesProjectOutputDir = if ($env:TF_BUILD) {
+            "$projectRoot\bin\${buildConfiguration}\${framework}" }
+        else {
+            "$projectRoot\Rules\bin\${buildConfiguration}\${framework}"
+        }
         if ($framework -eq 'net452') {
-            if ( $env:TF_BUILD ) {
-                $nsoft =  "$projectRoot\bin\${buildConfiguration}\${framework}\Newtonsoft.Json.dll"
-            }
-            else {
-                $nsoft =  "$projectRoot\Rules\bin\${buildConfiguration}\${framework}\Newtonsoft.Json.dll"
-            }
+            $nsoft = Join-Path $rulesProjectOutputDir 'Newtonsoft.Json.dll'
             Copy-Item -path $nsoft -Destination $destinationDirBinaries
+        }
+        else {
+            Copy-Item -Path (Join-Path $rulesProjectOutputDir 'Pluralize.NET.dll') -Destination $destinationDirBinaries
         }
 
         Pop-Location
@@ -378,7 +381,7 @@ function Test-ScriptAnalyzer
             $testModulePath = Join-Path "${projectRoot}" -ChildPath out
         }
         $testResultsFile = "'$(Join-Path ${projectRoot} -childPath TestResults.xml)'"
-        $testScripts = "'${projectRoot}\Tests\Engine','${projectRoot}\Tests\Rules','${projectRoot}\Tests\Documentation'"
+        $testScripts = "'${projectRoot}\Tests\Build','${projectRoot}\Tests\Engine','${projectRoot}\Tests\Rules','${projectRoot}\Tests\Documentation'"
         try {
             if ( $major -lt 5 ) {
                 Rename-Item $script:destinationDir ${testModulePath}
@@ -708,7 +711,13 @@ function Get-DotnetExe
     Write-Warning "Could not find dotnet executable"
     return [String]::Empty
 }
-$script:DotnetExe = Get-DotnetExe
+
+try {
+    $script:DotnetExe = Get-DotnetExe
+}
+catch {
+    Write-Warning "Could not find dotnet executable"
+}
 
 # Copies the built PSCompatibilityCollector module to the output destination for PSSA
 function Copy-CrossCompatibilityModule
@@ -754,5 +763,29 @@ function Copy-CrossCompatibilityModule
             # Display the problem as a warning, but continue
             Write-Warning $_
         }
+    }
+}
+
+# creates the nuget package which can be used for publishing to the gallery
+function Start-CreatePackage
+{
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseCompatibleCommands', '')]
+    param ( [switch]$signed )
+    try {
+        if ( $signed ) {
+            $buildRoot = "signed"
+        }
+        else {
+            $buildRoot = "out"
+        }
+        $repoName = [guid]::NewGuid().ToString()
+        $nupkgDir = Join-Path $PSScriptRoot $buildRoot
+        $null = Register-PSRepository -Name $repoName -InstallationPolicy Trusted -SourceLocation $nupkgDir
+        Push-Location $nupkgDir
+        Publish-Module -Path $PWD/PSScriptAnalyzer -Repository $repoName
+    }
+    finally {
+       Pop-Location
+       Unregister-PSRepository -Name $repoName
     }
 }
