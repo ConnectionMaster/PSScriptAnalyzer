@@ -1,7 +1,7 @@
 ---
 description: ReviewUnusedParameter
-ms.custom: PSSA v1.21.0
-ms.date: 06/28/2023
+ms.custom: PSSA v1.22.0
+ms.date: 03/26/2024
 ms.topic: reference
 title: ReviewUnusedParameter
 ---
@@ -13,6 +13,24 @@ title: ReviewUnusedParameter
 
 This rule identifies parameters declared in a script, scriptblock, or function scope that have not
 been used in that scope.
+
+## Configuration settings
+
+By default, this rule doesn't consider child scopes other than scriptblocks provided to
+`Where-Object` or `ForEach-Object`. The `CommandsToTraverse` setting is an string array allows you
+to add additional commands that accept scriptblocks that this rule should examine.
+
+```powershell
+@{
+    Rules = @{
+        PSReviewUnusedParameter = @{
+            CommandsToTraverse = @(
+                'Invoke-PSFProtectedCommand'
+            )
+        }
+    }
+}
+```
 
 ## How
 
